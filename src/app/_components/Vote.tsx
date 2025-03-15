@@ -73,13 +73,16 @@ export default function Vote() {
 
         <div className="flex flex-col space-y-2 text-2xl">
           <span>{`1등: ${
-            drawing_remains.filter((d) => d.prize === 1).length
+            drawing_remains.filter((d) => d.uuid === null && d.prize === 1)
+              .length
           }`}</span>
           <span>{`2등: ${
-            drawing_remains.filter((d) => d.prize === 2).length
+            drawing_remains.filter((d) => d.uuid === null && d.prize === 2)
+              .length
           }`}</span>
           <span>{`3등: ${
-            drawing_remains.filter((d) => d.prize === 3).length
+            drawing_remains.filter((d) => d.uuid === null && d.prize === 3)
+              .length
           }`}</span>
         </div>
       </section>
