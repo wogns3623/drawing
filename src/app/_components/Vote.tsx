@@ -102,7 +102,7 @@ function VoteButton() {
       <section className="flex justify-center items-center space-x-4 w-64">
         <Slot
           duration={myDrawing.data ? 1000 : 3000}
-          target={drawItemData ? drawItemData.ranking : null}
+          target={drawItemData ? 3 : null}
           times={10}
           onEnd={() => {
             setAnimationEnd(true);
@@ -170,7 +170,8 @@ function VoteButton() {
       ) : (
         <Button
           onClick={async () => {
-            if (drawItem.isPending) return;
+            console.log(drawItem);
+            if (drawItem.data || drawItem.isPending) return;
             setAnimationEnd(false);
 
             await drawItem.mutateAsync();
