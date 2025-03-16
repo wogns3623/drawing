@@ -1,16 +1,19 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon } from "lucide-react";
-import { useCallback, useMemo } from "react";
 import { v4 } from "uuid";
-import { createBrowserClient } from "@supabase/ssr";
+import {
+  drawItem as drawItemAction,
+  getDraws,
+  getMyDrawing,
+  registerStudentNumber as registerStudentNumberAction,
+} from "../actions";
+import { Slot, SlotItem } from "./Slot";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
 
-function getRandomInt(min: number, max: number) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
 const getUuid = () => {
   let uuid = localStorage.getItem("uuid");
 
@@ -22,130 +25,201 @@ const getUuid = () => {
   return uuid;
 };
 
-type DrawingRemains = {
-  id: number;
-  prize: number;
-  uuid: string | null;
-};
-
 export default function Vote() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-
-  const { data: my_drawing_exist, isLoading: isLoading1 } = useQuery({
-    queryKey: ["my_drawing_exist"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("drawing_remains")
-        .select("*")
-        .eq("uuid", getUuid());
-
-      if (error) throw error;
-      if (!data || data.length === 0) return null;
-      return data[0] as DrawingRemains;
-    },
+  const { data: draws, isLoading: isDrawsLoading } = useQuery({
+    queryKey: ["draws"],
+    queryFn: getDraws,
   });
 
-  const { data: drawing_remains, isLoading: isLoading2 } = useQuery({
-    queryKey: ["drawing_remains"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("drawing_remains")
-        .select("*");
-
-      if (error) throw error;
-      return data as DrawingRemains[];
-    },
-  });
-
-  if (isLoading1 || isLoading2) {
+  if (isDrawsLoading) {
     return <Loader2Icon className="animate-spin w-8 h-8 text-[#000]" />;
-  } else if (!drawing_remains) {
+  } else if (!draws) {
     return <div>오류!</div>;
   }
 
   return (
-    <div className="flex flex-col space-y-8">
-      <section className="flex flex-col space-y-2">
-        <p className="text-4xl">전광판</p>
+    <div className="grid grid-rows-3 gap-y-8 p-12 w-full">
+      <section className="flex flex-col items-center space-y-2">
+        <p className="text-4xl">뽑기 현황</p>
 
-        <div className="flex flex-col space-y-2 text-2xl">
-          <span>{`1등: ${
-            drawing_remains.filter((d) => d.uuid === null && d.prize === 1)
-              .length
-          }`}</span>
-          <span>{`2등: ${
-            drawing_remains.filter((d) => d.uuid === null && d.prize === 2)
-              .length
-          }`}</span>
-          <span>{`3등: ${
-            drawing_remains.filter((d) => d.uuid === null && d.prize === 3)
-              .length
-          }`}</span>
+        <div className="flex flex-col space-y-2 text-xl ">
+          <div>
+            <p>{`1등: ${
+              draws.filter((d) => d.client_uid === null && d.ranking === 1)[0]
+                .prize
+            }`}</p>
+            <p>{`${
+              draws.filter((d) => d.client_uid === null && d.ranking === 1)
+                .length
+            }명 남음`}</p>
+          </div>
+
+          <div>
+            <p>{`2등: ${
+              draws.filter((d) => d.client_uid === null && d.ranking === 2)[0]
+                .prize
+            }`}</p>
+            <p>{`${
+              draws.filter((d) => d.client_uid === null && d.ranking === 2)
+                .length
+            }명 남음`}</p>
+          </div>
+
+          <div>
+            <p>{`3등: ${
+              draws.filter((d) => d.client_uid === null && d.ranking === 3)[0]
+                .prize
+            }`}</p>
+            <p>{`${
+              draws.filter((d) => d.client_uid === null && d.ranking === 3)
+                .length
+            }명 남음`}</p>
+          </div>
         </div>
       </section>
 
-      <section className="flex justify-center items-center space-x-4">
-        {drawing_remains.length === 0 ? (
-          <div>뽑기 끝</div>
-        ) : my_drawing_exist ? (
-          <div>
-            <p>{`${my_drawing_exist.prize}등입니다!`}</p>
-          </div>
-        ) : (
-          <div>
-            <VoteButton drawing_remains={drawing_remains} />
-          </div>
-        )}
+      <section className="flex justify-center items-center w-full">
+        {draws.length === 0 ? <div>남은 뽑기가 없어요 😢</div> : <VoteButton />}
       </section>
     </div>
   );
 }
 
-function VoteButton({
-  drawing_remains,
-}: {
-  drawing_remains: DrawingRemains[];
-}) {
+const rankings = ["1등", "2등", "3등"];
+
+function VoteButton() {
   const queryClient = useQueryClient();
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const [animationEnd, setAnimationEnd] = useState(true);
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
 
-  const drawing_no_selected = useMemo(() => {
-    return drawing_remains.filter((d) => d.uuid === null);
-  }, [drawing_remains]);
+  const myDrawing = useQuery({
+    queryKey: ["myDrawing"],
+    queryFn: () => getMyDrawing(getUuid()),
+  });
 
-  const draw_result = useCallback(() => {
-    return drawing_no_selected[getRandomInt(0, drawing_no_selected.length - 1)];
-  }, [drawing_no_selected]);
-
-  const register = useCallback(
-    async (id: number) => {
-      const result = await supabase
-        .from("drawing_remains")
-        .update({ uuid: getUuid() })
-        .eq("id", id);
-
-      console.log(result);
-      queryClient.invalidateQueries({ queryKey: ["my_drawing_exist"] });
+  const drawItem = useMutation({
+    mutationFn: async () => {
+      const result = await drawItemAction(getUuid());
+      return result;
     },
-    [supabase, queryClient]
-  );
+  });
+
+  const drawItemData = drawItem.data || myDrawing.data;
 
   return (
-    <button
-      onClick={() => {
-        const { id, prize } = draw_result();
-        alert(`${id} ${prize}`);
-        register(id);
-      }}
-      className="px-4 py-2 bg-[#f0f0f0] rounded-md text-black"
-    >
-      뽑기
-    </button>
+    <div className="flex flex-col justify-center items-center space-y-4 w-full">
+      <section className="flex justify-center items-center space-x-4">
+        <Slot
+          duration={myDrawing.data ? 1000 : 3000}
+          target={drawItemData ? drawItemData.ranking - 1 : null}
+          times={10}
+          onEnd={() => {
+            setAnimationEnd(true);
+            queryClient.invalidateQueries({ queryKey: ["draws"] });
+            queryClient.invalidateQueries({ queryKey: ["myDrawing"] });
+          }}
+          className="h-20 bg-primary text-primary-foreground rounded-md w-16"
+        >
+          <div className={"py-4" + (drawItemData ? "" : " animate-slot-spin")}>
+            {rankings.map((ranking, i) => (
+              <SlotItem
+                key={i}
+                className="text-2xl py-1 flex justify-center items-center"
+              >
+                {ranking}
+              </SlotItem>
+            ))}
+            <SlotItem
+              key={rankings.length}
+              className="text-2xl py-1 flex justify-center items-center"
+            >
+              {rankings[0]}
+            </SlotItem>
+          </div>
+        </Slot>
+        {!(animationEnd && myDrawing.data) ? (
+          <Button
+            onClick={async () => {
+              if (drawItem.isPending) return;
+              setAnimationEnd(false);
+
+              await drawItem.mutateAsync();
+            }}
+            variant="default"
+            size="lg"
+            className="h-12"
+          >
+            뽑기
+          </Button>
+        ) : (
+          <div className="flex flex-col space-y-2">
+            <p className="text-3xl">{`🎉 ${myDrawing.data.ranking}등입니다!`}</p>
+
+            <p className="text-2xl text-wrap">{`상품: ${myDrawing.data.prize}`}</p>
+          </div>
+        )}
+      </section>
+
+      {animationEnd && myDrawing.data ? (
+        <div className="flex flex-col items-center space-y-2">
+          {showPhoneInput ? (
+            <StudentNumberInput />
+          ) : (
+            <section className="flex justify-center items-center space-x-2">
+              <a
+                href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}`}
+                className="mb-0"
+              >
+                <Button variant="default">입부하러 가기</Button>
+              </a>
+
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowPhoneInput(true);
+                }}
+              >
+                이미 회원이신가요?
+              </Button>
+            </section>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
+
+const StudentNumberInput = () => {
+  const [studentNumber, setStudentNumber] = useState("");
+  const registerStudentNumber = useMutation({
+    mutationFn: async () => {
+      const result = await registerStudentNumberAction(
+        getUuid(),
+        studentNumber
+      );
+      return result;
+    },
+  });
+
+  return (
+    <div className="flex items-center justify-center space-x-2">
+      <Input
+        type="text"
+        value={studentNumber}
+        onChange={(e) => setStudentNumber(e.target.value)}
+        placeholder="학번을 입력해주세요"
+      />
+
+      <Button
+        onClick={async () => {
+          if (registerStudentNumber.isPending) return;
+
+          await registerStudentNumber.mutateAsync();
+        }}
+        variant="default"
+      >
+        등록하기
+      </Button>
+    </div>
+  );
+};
