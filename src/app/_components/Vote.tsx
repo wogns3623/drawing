@@ -3,18 +3,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2Icon } from "lucide-react";
 import { v4 } from "uuid";
-import {
-  drawItem as drawItemAction,
-  getDraws,
-  getMyDrawing,
-  registerStudentNumber as registerStudentNumberAction,
-} from "../actions";
+import { drawItem as drawItemAction, getDraws, getMyDrawing } from "../actions";
 import { Slot, SlotItem } from "./Slot";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
-const getUuid = () => {
+const getClientUid = () => {
   let uuid = localStorage.getItem("uuid");
 
   if (!uuid) {
@@ -23,6 +28,10 @@ const getUuid = () => {
   }
 
   return uuid;
+};
+
+const setClientUid = (client_uid: string) => {
+  localStorage.setItem("uuid", client_uid);
 };
 
 export default function Vote() {
@@ -78,22 +87,43 @@ export default function Vote() {
 
 const rankings = ["1등", "2등", "3등"];
 
+const drawFormSchema = z.object({
+  studentNumber: z
+    .string({ required_error: "학번을 입력해주세요" })
+    .regex(/\d{10}/, {
+      message: "학번은 10자리 숫자여야 합니다",
+    }),
+});
+
 function VoteButton() {
   const queryClient = useQueryClient();
   const [animationEnd, setAnimationEnd] = useState(true);
-  const [showPhoneInput, setShowPhoneInput] = useState(false);
 
   const myDrawing = useQuery({
     queryKey: ["myDrawing"],
-    queryFn: () => getMyDrawing(getUuid()),
+    queryFn: () => getMyDrawing(getClientUid()),
   });
 
   const drawItem = useMutation({
-    mutationFn: async () => {
-      const result = await drawItemAction(getUuid());
+    mutationFn: async (studentNumber: string) => {
+      const result = await drawItemAction(getClientUid(), studentNumber);
+      if (result && result.client_uid) setClientUid(result.client_uid);
+
       return result;
     },
   });
+
+  const drawForm = useForm<z.infer<typeof drawFormSchema>>({
+    resolver: zodResolver(drawFormSchema),
+  });
+
+  // 2. Define a submit handler.
+  const onSubmit = async (values: z.infer<typeof drawFormSchema>) => {
+    if (drawItem.data || drawItem.isPending) return;
+    setAnimationEnd(false);
+
+    await drawItem.mutateAsync(values.studentNumber);
+  };
 
   const drawItemData = drawItem.data || myDrawing.data;
 
@@ -102,7 +132,7 @@ function VoteButton() {
       <section className="flex justify-center items-center space-x-4 w-64">
         <Slot
           duration={myDrawing.data ? 1000 : 3000}
-          target={drawItemData ? 3 : null}
+          target={drawItemData ? drawItemData.ranking : null}
           times={10}
           onEnd={() => {
             setAnimationEnd(true);
@@ -143,81 +173,50 @@ function VoteButton() {
         )}
       </section>
 
-      {animationEnd && myDrawing.data ? (
-        <div className="flex flex-col items-center space-y-2">
-          {showPhoneInput ? (
-            <StudentNumberInput />
+      <section className="h-24 flex justify-center items-start space-x-2">
+        {animationEnd && myDrawing.data ? (
+          myDrawing.data.member ? (
+            <p className="text-2xl">{`🎉 ${myDrawing.data.member.name}님 축하합니다!`}</p>
           ) : (
-            <section className="flex justify-center items-center space-x-2">
-              <a
-                href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}`}
-                className="mb-0"
-              >
-                <Button variant="default">입부하러 가기</Button>
-              </a>
+            <a
+              key="a"
+              href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}`}
+              className="mb-0"
+            >
+              <Button variant="default">입부하러 가기</Button>
+            </a>
+          )
+        ) : !drawItem.data && !drawItem.isPending ? (
+          <Form {...drawForm}>
+            <form onSubmit={(e) => e.preventDefault()}>
+              <FormField
+                control={drawForm.control}
+                name="studentNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="학번을 입력해주세요"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
 
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setShowPhoneInput(true);
-                }}
-              >
-                이미 회원이신가요?
-              </Button>
-            </section>
-          )}
-        </div>
-      ) : (
-        <Button
-          onClick={async () => {
-            console.log(drawItem);
-            if (drawItem.data || drawItem.isPending) return;
-            setAnimationEnd(false);
-
-            await drawItem.mutateAsync();
-          }}
-          variant="default"
-          size="lg"
-          className="w-16"
-        >
-          뽑기
-        </Button>
-      )}
+            <Button
+              key="d"
+              onClick={drawForm.handleSubmit(onSubmit)}
+              variant="default"
+            >
+              뽑기
+            </Button>
+          </Form>
+        ) : null}
+      </section>
     </div>
   );
 }
-
-const StudentNumberInput = () => {
-  const [studentNumber, setStudentNumber] = useState("");
-  const registerStudentNumber = useMutation({
-    mutationFn: async () => {
-      const result = await registerStudentNumberAction(
-        getUuid(),
-        studentNumber
-      );
-      return result;
-    },
-  });
-
-  return (
-    <div className="flex items-center justify-center space-x-2">
-      <Input
-        type="text"
-        value={studentNumber}
-        onChange={(e) => setStudentNumber(e.target.value)}
-        placeholder="학번을 입력해주세요"
-      />
-
-      <Button
-        onClick={async () => {
-          if (registerStudentNumber.isPending) return;
-
-          await registerStudentNumber.mutateAsync();
-        }}
-        variant="default"
-      >
-        등록하기
-      </Button>
-    </div>
-  );
-};
