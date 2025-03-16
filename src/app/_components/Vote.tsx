@@ -44,10 +44,7 @@ export default function Vote() {
 
         <div className="flex flex-col space-y-2 text-xl ">
           <div>
-            <p>{`1등: ${
-              draws.filter((d) => d.client_uid === null && d.ranking === 1)[0]
-                .prize
-            }`}</p>
+            <p>{`1등: ${draws.filter((d) => d.ranking === 1)[0].prize}`}</p>
             <p>{`${
               draws.filter((d) => d.client_uid === null && d.ranking === 1)
                 .length
@@ -55,10 +52,7 @@ export default function Vote() {
           </div>
 
           <div>
-            <p>{`2등: ${
-              draws.filter((d) => d.client_uid === null && d.ranking === 2)[0]
-                .prize
-            }`}</p>
+            <p>{`2등: ${draws.filter((d) => d.ranking === 2)[0].prize}`}</p>
             <p>{`${
               draws.filter((d) => d.client_uid === null && d.ranking === 2)
                 .length
@@ -66,10 +60,7 @@ export default function Vote() {
           </div>
 
           <div>
-            <p>{`3등: ${
-              draws.filter((d) => d.client_uid === null && d.ranking === 3)[0]
-                .prize
-            }`}</p>
+            <p>{`3등: ${draws.filter((d) => d.ranking === 3)[0].prize}`}</p>
             <p>{`${
               draws.filter((d) => d.client_uid === null && d.ranking === 3)
                 .length
@@ -108,10 +99,10 @@ function VoteButton() {
 
   return (
     <div className="flex flex-col justify-center items-center space-y-4 w-full">
-      <section className="flex justify-center items-center space-x-4">
+      <section className="flex justify-center items-center space-x-4 w-64">
         <Slot
           duration={myDrawing.data ? 1000 : 3000}
-          target={drawItemData ? drawItemData.ranking - 1 : null}
+          target={drawItemData ? drawItemData.ranking : null}
           times={10}
           onEnd={() => {
             setAnimationEnd(true);
@@ -121,6 +112,12 @@ function VoteButton() {
           className="h-20 bg-primary text-primary-foreground rounded-md w-16"
         >
           <div className={"py-4" + (drawItemData ? "" : " animate-slot-spin")}>
+            <SlotItem
+              key={-1}
+              className="text-2xl py-1 flex justify-center items-center"
+            >
+              {rankings.at(-1)}
+            </SlotItem>
             {rankings.map((ranking, i) => (
               <SlotItem
                 key={i}
@@ -137,22 +134,8 @@ function VoteButton() {
             </SlotItem>
           </div>
         </Slot>
-        {!(animationEnd && myDrawing.data) ? (
-          <Button
-            onClick={async () => {
-              if (drawItem.isPending) return;
-              setAnimationEnd(false);
-
-              await drawItem.mutateAsync();
-            }}
-            variant="default"
-            size="lg"
-            className="h-12"
-          >
-            뽑기
-          </Button>
-        ) : (
-          <div className="flex flex-col space-y-2">
+        {animationEnd && myDrawing.data && (
+          <div className="flex-1 flex flex-col space-y-2">
             <p className="text-3xl">{`🎉 ${myDrawing.data.ranking}등입니다!`}</p>
 
             <p className="text-2xl text-wrap">{`상품: ${myDrawing.data.prize}`}</p>
@@ -184,7 +167,21 @@ function VoteButton() {
             </section>
           )}
         </div>
-      ) : null}
+      ) : (
+        <Button
+          onClick={async () => {
+            if (drawItem.isPending) return;
+            setAnimationEnd(false);
+
+            await drawItem.mutateAsync();
+          }}
+          variant="default"
+          size="lg"
+          className="w-16"
+        >
+          뽑기
+        </Button>
+      )}
     </div>
   );
 }
