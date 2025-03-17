@@ -9,11 +9,11 @@ export const drawing = pgTable("2025-1-drawing", (col) => ({
   clientUid: col.uuid(),
   ip: col.text(),
   createdAt: col
-    .timestamp()
+    .timestamp({ withTimezone: true })
     .notNull()
     .default(sql`now()`),
   updatedAt: col
-    .timestamp()
+    .timestamp({ withTimezone: true, mode: "string" })
     .$onUpdateFn(() => sql`now()`)
     .notNull(),
 }));
@@ -28,16 +28,16 @@ export const members = pgTable("members", (col) => ({
   phone: col.varchar({ length: 256 }),
   email: col.text(),
   registered_semester: col
-    .timestamp()
+    .timestamp({ withTimezone: true })
     .array()
     .notNull()
     .$default(() => sql`[now()]`),
   createdAt: col
-    .timestamp()
+    .timestamp({ withTimezone: true })
     .notNull()
     .default(sql`now()`),
   updatedAt: col
-    .timestamp()
+    .timestamp({ withTimezone: true, mode: "string" })
     .$onUpdateFn(() => sql`now()`)
     .notNull(),
 }));
