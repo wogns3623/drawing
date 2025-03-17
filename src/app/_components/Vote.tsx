@@ -50,7 +50,7 @@ export default function Vote() {
   }
 
   return (
-    <div className="grid grid-rows-3 gap-y-8 p-12 w-full">
+    <div className="flex flex-col justify-center items-center space-y-8 w-full">
       <section className="flex flex-col items-center space-y-2">
         <p className="text-4xl">뽑기 현황</p>
 
