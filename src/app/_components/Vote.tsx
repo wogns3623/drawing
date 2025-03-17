@@ -172,7 +172,7 @@ function VoteButton() {
           </div>
         </Slot>
         {animationEnd && myDrawing.data && (
-          <div className="flex-1 flex flex-col space-y-2">
+          <div className="flex flex-col space-y-2">
             <p className="text-3xl">{`🎉 ${myDrawing.data.ranking}등입니다!`}</p>
 
             <p className="text-2xl text-wrap">{`상품: ${myDrawing.data.prize}`}</p>
