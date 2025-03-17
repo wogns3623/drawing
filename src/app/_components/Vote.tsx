@@ -6,7 +6,7 @@ import { v4 } from "uuid";
 import { drawItem as drawItemAction, getDraws, getMyDrawing } from "../actions";
 import { Slot, SlotItem } from "./Slot";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -18,7 +18,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-// import QRCode from "react-qr-code";
+import QRCode from "react-qr-code";
 
 const getClientUid = () => {
   let uuid = localStorage.getItem("uuid");
@@ -101,15 +101,16 @@ const drawFormSchema = z.object({
 function VoteButton() {
   const queryClient = useQueryClient();
   const [animationEnd, setAnimationEnd] = useState(true);
+  const uuidRef = useRef(getClientUid());
 
   const myDrawing = useQuery({
     queryKey: ["myDrawing"],
-    queryFn: () => getMyDrawing(getClientUid()),
+    queryFn: () => getMyDrawing(uuidRef.current),
   });
 
   const drawItem = useMutation({
     mutationFn: async (studentNumber: string) => {
-      const result = await drawItemAction(getClientUid(), studentNumber);
+      const result = await drawItemAction(uuidRef.current, studentNumber);
       if (result && result.client_uid) setClientUid(result.client_uid);
 
       return result;
@@ -185,9 +186,9 @@ function VoteButton() {
             <p className="text-2xl">{`🎉 ${myDrawing.data.member.name}님 축하합니다!`}</p>
           ) : (
             <div className="flex flex-col items-center space-y-2">
-              {/* <QRCode
+              <QRCode
                 value={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}&entry.1650136422=${myDrawing.data.studentNumber}`}
-              /> */}
+              />
               <a
                 key="a"
                 href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}&entry.1650136422=${myDrawing.data.studentNumber}`}
