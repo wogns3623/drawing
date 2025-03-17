@@ -2,21 +2,26 @@
 
 import { db } from "@/utils/db";
 import { drawing, members } from "@/utils/schemas";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
+import { headers } from "next/headers";
 
 export async function getDraws() {
   const draws = await db.query.drawing.findMany({
-    columns: { ranking: true, prize: true, client_uid: true },
+    columns: { ranking: true, prize: true, clientUid: true },
   });
 
   return draws;
 }
 
-export async function getMyDrawing(uuid: string) {
+export async function getMyDrawing(clientUid: string) {
+  const forwardedFor = (await headers()).get("x-forwarded-for");
+  const ip = forwardedFor ? forwardedFor.split(",")[0] : null;
+  console.log({ clientUid, ip });
+
   const [myDrawing] = await db
     .select()
     .from(drawing)
-    .where(eq(drawing.client_uid, uuid))
+    .where(eq(drawing.clientUid, clientUid))
     .leftJoin(members, eq(drawing.studentNumber, members.studentNumber));
 
   if (!myDrawing) return null;
@@ -28,12 +33,23 @@ export async function getMyDrawing(uuid: string) {
 }
 
 /** @return null if no draw item remaining */
-export async function drawItem(uuid: string, studentNumber: string) {
+export async function drawItem(clientUid: string, studentNumber: string) {
+  const forwardedFor = (await headers()).get("x-forwarded-for");
+  const ip = forwardedFor ? forwardedFor.split(",")[0] : null;
+
+  console.log({ clientUid, ip, studentNumber });
+
   // check exist drawing
   const [existDrawing] = await db
     .select()
     .from(drawing)
-    .where(eq(drawing.studentNumber, studentNumber))
+    .where(
+      or(
+        eq(drawing.studentNumber, studentNumber),
+        eq(drawing.clientUid, clientUid),
+        ip ? eq(drawing.ip, ip) : undefined
+      )
+    )
     .leftJoin(members, eq(drawing.studentNumber, members.studentNumber));
 
   if (existDrawing)
@@ -43,9 +59,8 @@ export async function drawItem(uuid: string, studentNumber: string) {
     };
 
   const drawRemains = await db.query.drawing.findMany({
-    where: (tb, op) => op.isNull(tb.client_uid),
+    where: (tb, op) => op.isNull(tb.clientUid),
   });
-
   if (drawRemains.length === 0) return null;
 
   const randomDraw =
@@ -53,7 +68,7 @@ export async function drawItem(uuid: string, studentNumber: string) {
 
   const [updatedDrawing] = await db
     .update(drawing)
-    .set({ client_uid: uuid, studentNumber })
+    .set({ clientUid, studentNumber, ip })
     .where(eq(drawing.id, randomDraw.id))
     .returning();
 
@@ -65,13 +80,13 @@ export async function drawItem(uuid: string, studentNumber: string) {
 }
 
 export async function registerStudentNumber(
-  uuid: string,
+  clientUid: string,
   studentNumber: string
 ) {
   const updatedDrawing = await db
     .update(drawing)
     .set({ studentNumber })
-    .where(eq(drawing.client_uid, uuid));
+    .where(eq(drawing.clientUid, clientUid));
 
   return updatedDrawing;
 }

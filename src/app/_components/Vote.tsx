@@ -21,8 +21,8 @@ import { z } from "zod";
 import QRCode from "react-qr-code";
 
 const getClientUid = () => {
+  if (process.env.NODE_ENV === "development") localStorage.removeItem("uuid");
   let uuid = localStorage.getItem("uuid");
-  // let uuid;
 
   if (!uuid) {
     uuid = v4();
@@ -58,7 +58,7 @@ export default function Vote() {
           <div>
             <p>{`1등: ${draws.filter((d) => d.ranking === 1)[0].prize}`}</p>
             <p>{`${
-              draws.filter((d) => d.client_uid === null && d.ranking === 1)
+              draws.filter((d) => d.clientUid === null && d.ranking === 1)
                 .length
             }명 남음`}</p>
           </div>
@@ -66,7 +66,7 @@ export default function Vote() {
           <div>
             <p>{`2등: ${draws.filter((d) => d.ranking === 2)[0].prize}`}</p>
             <p>{`${
-              draws.filter((d) => d.client_uid === null && d.ranking === 2)
+              draws.filter((d) => d.clientUid === null && d.ranking === 2)
                 .length
             }명 남음`}</p>
           </div>
@@ -74,7 +74,7 @@ export default function Vote() {
           <div>
             <p>{`3등: ${draws.filter((d) => d.ranking === 3)[0].prize}`}</p>
             <p>{`${
-              draws.filter((d) => d.client_uid === null && d.ranking === 3)
+              draws.filter((d) => d.clientUid === null && d.ranking === 3)
                 .length
             }명 남음`}</p>
           </div>
@@ -111,7 +111,7 @@ function VoteButton() {
   const drawItem = useMutation({
     mutationFn: async (studentNumber: string) => {
       const result = await drawItemAction(uuidRef.current, studentNumber);
-      if (result && result.client_uid) setClientUid(result.client_uid);
+      if (result && result.clientUid) setClientUid(result.clientUid);
 
       return result;
     },

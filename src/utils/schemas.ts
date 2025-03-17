@@ -6,7 +6,8 @@ export const drawing = pgTable("2025-1-drawing", (col) => ({
   ranking: col.smallint().notNull(),
   prize: col.text().notNull(),
   studentNumber: col.varchar({ length: 256 }),
-  client_uid: col.uuid(),
+  clientUid: col.uuid(),
+  ip: col.text(),
   createdAt: col
     .timestamp()
     .notNull()
