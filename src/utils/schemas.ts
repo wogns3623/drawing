@@ -8,10 +8,11 @@ export const drawing = pgTable("2025-1-drawing", (col) => ({
   studentNumber: col.varchar({ length: 256 }),
   clientUid: col.uuid(),
   ip: col.text(),
-  createdAt: col
-    .timestamp()
-    .notNull()
-    .default(sql`now()`),
+  createdAt: col.timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: col
+    .timestamp({ withTimezone: true })
+    .$onUpdateFn(() => sql`now()`)
+    .notNull(),
 }));
 
 export type Drawing = typeof drawing.$inferSelect;
@@ -24,14 +25,15 @@ export const members = pgTable("members", (col) => ({
   phone: col.varchar({ length: 256 }),
   email: col.text(),
   registered_semester: col
-    .timestamp()
+    .timestamp({ withTimezone: true })
     .array()
     .notNull()
     .default(sql`[now()]`),
-  createdAt: col
-    .timestamp()
-    .notNull()
-    .default(sql`now()`),
+  createdAt: col.timestamp({ withTimezone: true }).notNull().defaultNow(),
+  updatedAt: col
+    .timestamp({ withTimezone: true })
+    .$onUpdateFn(() => sql`now()`)
+    .notNull(),
 }));
 
 export type Members = typeof members.$inferSelect;
