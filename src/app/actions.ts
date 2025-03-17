@@ -37,8 +37,6 @@ export async function drawItem(clientUid: string, studentNumber: string) {
   const forwardedFor = (await headers()).get("x-forwarded-for");
   const ip = forwardedFor ? forwardedFor.split(",")[0] : null;
 
-  console.log({ clientUid, ip, studentNumber });
-
   // check exist drawing
   const [existDrawing] = await db
     .select()
