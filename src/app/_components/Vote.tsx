@@ -18,9 +18,11 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+// import QRCode from "react-qr-code";
 
 const getClientUid = () => {
   let uuid = localStorage.getItem("uuid");
+  // let uuid;
 
   if (!uuid) {
     uuid = v4();
@@ -38,6 +40,7 @@ export default function Vote() {
   const { data: draws, isLoading: isDrawsLoading } = useQuery({
     queryKey: ["draws"],
     queryFn: getDraws,
+    refetchInterval: 5000,
   });
 
   if (isDrawsLoading) {
@@ -115,6 +118,9 @@ function VoteButton() {
 
   const drawForm = useForm<z.infer<typeof drawFormSchema>>({
     resolver: zodResolver(drawFormSchema),
+    defaultValues: {
+      studentNumber: "",
+    },
   });
 
   // 2. Define a submit handler.
@@ -129,7 +135,7 @@ function VoteButton() {
 
   return (
     <div className="flex flex-col justify-center items-center space-y-4 w-full">
-      <section className="flex justify-center items-center space-x-4 w-64">
+      <section className="flex justify-center items-center space-x-4 w-1/2">
         <Slot
           duration={myDrawing.data ? 1000 : 3000}
           target={drawItemData ? drawItemData.ranking : null}
@@ -178,13 +184,18 @@ function VoteButton() {
           myDrawing.data.member ? (
             <p className="text-2xl">{`🎉 ${myDrawing.data.member.name}님 축하합니다!`}</p>
           ) : (
-            <a
-              key="a"
-              href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}`}
-              className="mb-0"
-            >
-              <Button variant="default">입부하러 가기</Button>
-            </a>
+            <div className="flex flex-col items-center space-y-2">
+              {/* <QRCode
+                value={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}&entry.1650136422=${myDrawing.data.studentNumber}`}
+              /> */}
+              <a
+                key="a"
+                href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}&entry.1650136422=${myDrawing.data.studentNumber}`}
+                className="mb-0"
+              >
+                <Button variant="default">입부하러 가기</Button>
+              </a>
+            </div>
           )
         ) : !drawItem.data && !drawItem.isPending ? (
           <Form {...drawForm}>
@@ -198,6 +209,7 @@ function VoteButton() {
                       <Input
                         type="text"
                         placeholder="학번을 입력해주세요"
+                        autoFocus
                         {...field}
                       />
                     </FormControl>
