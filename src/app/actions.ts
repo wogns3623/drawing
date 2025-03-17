@@ -13,16 +13,38 @@ export async function getDraws() {
   return draws;
 }
 
-export async function getMyDrawing(clientUid: string) {
+const getIp = async () => {
   const forwardedFor = (await headers()).get("x-forwarded-for");
   const ip = forwardedFor ? forwardedFor.split(",")[0] : null;
-  console.log({ clientUid, ip });
+
+  return ip;
+};
+
+const whitelist = ["::1", "127.0.0.1"];
+const isInWhitelist = (ip: string) => whitelist.includes(ip);
+
+const trackIp = async (ip: string) => {
+  const result = await fetch(`https://ipwho.is/${ip}`);
+  const geolocation = await result.json();
+
+  return geolocation;
+};
+
+export async function getMyDrawing(clientUid: string) {
+  const ip = await getIp();
+  console.log("getMyDrawing", { clientUid, ip });
 
   const [myDrawing] = await db
     .select()
     .from(drawing)
     .where(eq(drawing.clientUid, clientUid))
-    .leftJoin(members, eq(drawing.studentNumber, members.studentNumber));
+    .leftJoin(
+      members,
+      or(
+        eq(drawing.studentNumber, members.studentNumber),
+        eq(drawing.phone, members.phone)
+      )
+    );
 
   if (!myDrawing) return null;
 
@@ -33,9 +55,25 @@ export async function getMyDrawing(clientUid: string) {
 }
 
 /** @return null if no draw item remaining */
-export async function drawItem(clientUid: string, studentNumber: string) {
-  const forwardedFor = (await headers()).get("x-forwarded-for");
-  const ip = forwardedFor ? forwardedFor.split(",")[0] : null;
+export async function drawItem(
+  clientUid: string,
+  { phone, studentNumber }: { phone?: string; studentNumber?: string }
+) {
+  if (!phone && !studentNumber) return null;
+  const ip = await getIp();
+  if (ip && !isInWhitelist(ip)) {
+    const geolocation = await trackIp(ip);
+
+    console.log("drawItem", {
+      clientUid,
+      ip,
+      phone,
+      studentNumber,
+      geolocation,
+    });
+
+    if (geolocation.success && geolocation.country_code !== "KR") return null;
+  }
 
   // check exist drawing
   const [existDrawing] = await db
@@ -43,9 +81,9 @@ export async function drawItem(clientUid: string, studentNumber: string) {
     .from(drawing)
     .where(
       or(
-        eq(drawing.studentNumber, studentNumber),
         eq(drawing.clientUid, clientUid),
-        ip ? eq(drawing.ip, ip) : undefined
+        studentNumber ? eq(drawing.studentNumber, studentNumber) : undefined,
+        phone ? eq(drawing.phone, phone) : undefined
       )
     )
     .leftJoin(members, eq(drawing.studentNumber, members.studentNumber));
@@ -66,25 +104,17 @@ export async function drawItem(clientUid: string, studentNumber: string) {
 
   const [updatedDrawing] = await db
     .update(drawing)
-    .set({ clientUid, studentNumber, ip })
+    .set({ clientUid, studentNumber, phone, ip })
     .where(eq(drawing.id, randomDraw.id))
     .returning();
 
   const existMember = await db.query.members.findFirst({
-    where: (tb, op) => op.eq(tb.studentNumber, studentNumber),
+    where: (tb, op) =>
+      op.or(
+        studentNumber ? eq(drawing.studentNumber, studentNumber) : undefined,
+        phone ? eq(drawing.phone, phone) : undefined
+      ),
   });
 
   return { ...updatedDrawing, member: existMember ?? null };
-}
-
-export async function registerStudentNumber(
-  clientUid: string,
-  studentNumber: string
-) {
-  const updatedDrawing = await db
-    .update(drawing)
-    .set({ studentNumber })
-    .where(eq(drawing.clientUid, clientUid));
-
-  return updatedDrawing;
 }

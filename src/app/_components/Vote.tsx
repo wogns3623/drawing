@@ -6,7 +6,7 @@ import { v4 } from "uuid";
 import { drawItem as drawItemAction, getDraws, getMyDrawing } from "../actions";
 import { Slot, SlotItem } from "./Slot";
 import { Button } from "@/components/ui/button";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Form,
@@ -32,8 +32,15 @@ const getClientUid = () => {
   return uuid;
 };
 
-const setClientUid = (client_uid: string) => {
-  localStorage.setItem("uuid", client_uid);
+const useClientUid = () => {
+  const [clientUid, setClientUidRaw] = useState(getClientUid());
+
+  const setClientUid = (clientUid: string) => {
+    localStorage.setItem("uuid", clientUid);
+    setClientUidRaw(clientUid);
+  };
+
+  return [clientUid, setClientUid] as const;
 };
 
 export default function Vote() {
@@ -81,9 +88,13 @@ export default function Vote() {
         </div>
       </section>
 
-      <section className="flex justify-center items-center w-full">
-        {draws.length === 0 ? <div>남은 뽑기가 없어요 😢</div> : <VoteButton />}
-      </section>
+      {draws.length === 0 ? (
+        <section className="flex justify-center items-center w-full">
+          남은 뽑기가 없어요 😢
+        </section>
+      ) : (
+        <VoteButton />
+      )}
     </div>
   );
 }
@@ -91,26 +102,32 @@ export default function Vote() {
 const rankings = ["1등", "2등", "3등"];
 
 const drawFormSchema = z.object({
-  studentNumber: z
-    .string({ required_error: "학번을 입력해주세요" })
-    .regex(/\d{10}/, {
-      message: "학번은 10자리 숫자여야 합니다",
-    }),
+  phone: z
+    .string({ required_error: "전화번호를 입력해주세요" })
+    .regex(/[\d-]{11,15}/, { message: "전화번호를 입력해주세요" })
+    .transform((v) => v.replace(/-/g, "")),
+  // studentNumber: z
+  //   .string({ required_error: "학번을 입력해주세요" })
+  //   .regex(/\d{10}/, {
+  //     message: "학번은 10자리 숫자여야 합니다",
+  //   }),
 });
 
 function VoteButton() {
   const queryClient = useQueryClient();
   const [animationEnd, setAnimationEnd] = useState(true);
-  const uuidRef = useRef(getClientUid());
+  // const uuidRef = useRef(getClientUid());
+
+  const [clientUid, setClientUid] = useClientUid();
 
   const myDrawing = useQuery({
     queryKey: ["myDrawing"],
-    queryFn: () => getMyDrawing(uuidRef.current),
+    queryFn: () => getMyDrawing(clientUid),
   });
 
   const drawItem = useMutation({
-    mutationFn: async (studentNumber: string) => {
-      const result = await drawItemAction(uuidRef.current, studentNumber);
+    mutationFn: async (phone: string) => {
+      const result = await drawItemAction(clientUid, { phone });
       if (result && result.clientUid) setClientUid(result.clientUid);
 
       return result;
@@ -120,7 +137,7 @@ function VoteButton() {
   const drawForm = useForm<z.infer<typeof drawFormSchema>>({
     resolver: zodResolver(drawFormSchema),
     defaultValues: {
-      studentNumber: "",
+      phone: "",
     },
   });
 
@@ -129,13 +146,27 @@ function VoteButton() {
     if (drawItem.data || drawItem.isPending) return;
     setAnimationEnd(false);
 
-    await drawItem.mutateAsync(values.studentNumber);
+    await drawItem.mutateAsync(values.phone);
   };
 
   const drawItemData = drawItem.data || myDrawing.data;
 
+  const getFormUrl = (drawing: typeof drawItemData) => {
+    let formUrl =
+      "https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url";
+
+    if (drawing) {
+      formUrl += `&entry.898537491=${drawing.id}`;
+      if (drawing.studentNumber)
+        formUrl += `&entry.1650136422=${drawing.studentNumber}`;
+      if (drawing.phone) formUrl += `&entry.1095703242=${drawing.phone}`;
+    }
+
+    return formUrl;
+  };
+
   return (
-    <div className="flex flex-col justify-center items-center space-y-4 w-full">
+    <section className="flex flex-col justify-center items-center space-y-4 w-full">
       <section className="flex justify-center items-center space-x-4 w-1/2">
         <Slot
           duration={myDrawing.data ? 1000 : 3000}
@@ -186,30 +217,27 @@ function VoteButton() {
             <p className="text-2xl">{`🎉 ${myDrawing.data.member.name}님 축하합니다!`}</p>
           ) : (
             <div className="flex flex-col items-center space-y-2">
-              <QRCode
-                value={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}&entry.1650136422=${myDrawing.data.studentNumber}`}
-              />
-              <a
-                key="a"
-                href={`https://docs.google.com/forms/d/e/1FAIpQLSf90epHRDdLhx85a9vZOqB3JkkHKKgDr9SIj5D_ukdVJ5vMgw/viewform?usp=pp_url&entry.898537491=${myDrawing.data.id}&entry.1650136422=${myDrawing.data.studentNumber}`}
-                className="mb-0"
-              >
+              <QRCode value={getFormUrl(myDrawing.data)} />
+              <a href={getFormUrl(myDrawing.data)} className="mb-0">
                 <Button variant="default">입부하러 가기</Button>
               </a>
             </div>
           )
         ) : !drawItem.data && !drawItem.isPending ? (
           <Form {...drawForm}>
-            <form onSubmit={(e) => e.preventDefault()}>
+            <form
+              onSubmit={drawForm.handleSubmit(onSubmit)}
+              className="flex justify-center items-start space-x-2"
+            >
               <FormField
                 control={drawForm.control}
-                name="studentNumber"
+                name="phone"
                 render={({ field }) => (
                   <FormItem>
                     <FormControl>
                       <Input
                         type="text"
-                        placeholder="학번을 입력해주세요"
+                        placeholder="전화번호를 입력해주세요"
                         autoFocus
                         {...field}
                       />
@@ -218,18 +246,16 @@ function VoteButton() {
                   </FormItem>
                 )}
               />
-            </form>
 
-            <Button
-              key="d"
-              onClick={drawForm.handleSubmit(onSubmit)}
-              variant="default"
-            >
-              뽑기
-            </Button>
+              <Input type="submit" className="hidden" />
+
+              <Button type="submit" variant="default">
+                뽑기
+              </Button>
+            </form>
           </Form>
         ) : null}
       </section>
-    </div>
+    </section>
   );
 }
