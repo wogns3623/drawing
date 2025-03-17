@@ -8,7 +8,10 @@ export const drawing = pgTable("2025-1-drawing", (col) => ({
   studentNumber: col.varchar({ length: 256 }),
   clientUid: col.uuid(),
   ip: col.text(),
-  createdAt: col.timestamp({ withTimezone: true }).notNull().defaultNow(),
+  createdAt: col
+    .timestamp({ withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
   updatedAt: col
     .timestamp({ withTimezone: true })
     .$onUpdateFn(() => sql`now()`)
@@ -29,7 +32,10 @@ export const members = pgTable("members", (col) => ({
     .array()
     .notNull()
     .default(sql`[now()]`),
-  createdAt: col.timestamp({ withTimezone: true }).notNull().defaultNow(),
+  createdAt: col
+    .timestamp({ withTimezone: true })
+    .notNull()
+    .default(sql`now()`),
   updatedAt: col
     .timestamp({ withTimezone: true })
     .$onUpdateFn(() => sql`now()`)
